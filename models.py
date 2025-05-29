@@ -118,7 +118,7 @@ class Veiculos(Base):
     #     db_session.delete(self)
     #     db_session.commit()
 
-    # Coloca os dados na TAbela
+    # Coloca os dados na Tabela
     def get_emprestimo(self):
         dados_emprestimos = {
             'id': self.id,
@@ -133,5 +133,6 @@ class Veiculos(Base):
 
 def init_db():
     Base.metadata.create_all(engine)
+
 if __name__ == '__main__':
     init_db()

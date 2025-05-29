@@ -1,8 +1,9 @@
 from flask import Flask, jsonify, request
 from flask_pydantic_spec import FlaskPydanticSpec
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from models import Clientes, Ordem_de_servicos, Veiculos, banco_session
 from sqlalchemy import select
+
 app = Flask(__name__)
 spec = FlaskPydanticSpec('Flask',
                          title='Flask API',
@@ -10,6 +11,7 @@ spec = FlaskPydanticSpec('Flask',
 
 spec.register(app)
 app.secret_key = 'key_secret'
+
 
 @app.route('/cadastrar_nv', methods=['POST'])
 def cadastrar_nv():
@@ -45,10 +47,10 @@ def cadastrar_nv():
         else:
             try:
                 usuario_salvo = Clientes(nome=nome,
-                                            CPF=int(cpf),
-                                            telefone=int(telefone),
-                                            endereco=endereco,
-                                            email=email,
+                                         CPF=int(cpf),
+                                         telefone=int(telefone),
+                                         endereco=endereco,
+                                         email=email,
                                          )
                 usuario_salvo.save(banco_session)
                 return jsonify({
@@ -59,6 +61,7 @@ def cadastrar_nv():
                     'email': usuario_salvo.email})
             except IntegrityError as e:
                 return jsonify({'error': str(e)})
+
 
 @app.route('/consultar_cliente')
 def consultar_clientes():
@@ -76,36 +79,42 @@ def consultar_clientes():
     except IntegrityError as e:
         return jsonify({'error': str(e)})
 
-@app.route('/cadastrar_veiculo_nv',methods=['POST'])
+
+@app.route('/cadastrar_veiculo_nv', methods=['POST'])
 def cadastrar_veiculo_nv():
-    if request.method == 'POST':
-        cliente_associados = request.form.get('cliente_associados')
-        marca = request.form.get('marca')
-        modelo = request.form.get('modelo')
-        placa = request.form.get('placa')
-        ano_de_fabricacao = request.form.get('ano_de_fabricacao')
-        placa_registrada = select(Veiculos)
-        placa_buscada = banco_session.execute(placa_registrada.filter_by(placa=placa)).first()
+    dados = request.get_json()
+    cliente_associados = dados['cliente_associados']
+    marca = dados['marca']
+    modelo = dados['modelo']
+    placa = dados['placa']
+    ano_de_fabricacao = dados['ano_de_fabricacao']
+    senha = dados['senha']
+
+    if not cliente_associados or not senha:
+        return jsonify({"msg": 'Insira o cliente associado e a senha'}), 400
+
+    db_session = banco_session()
+    try:
+        # Verificar se já existe
+        placa_check = select(Veiculos).where(Veiculos.placa == placa)
+        placa_buscada = db_session.execute(placa_check).scalar()
+
         if placa_buscada:
-            return jsonify({"error": 'Placa ja cadastrado'})
-        else:
-            try:
-                cliente_associados = int(cliente_associados)
-                placa = int(placa)
-                veiculo = Veiculos(cliente_associados=cliente_associados,
-                                   marca=marca,
-                                   modelo=modelo,
-                                   placa=placa,
-                                   ano_de_fabricacao=ano_de_fabricacao)
-                veiculo.save(banco_session)
-                return jsonify({'cliente_associados': cliente_associados},
-                               {'marca': marca},
-                               {'modelo': modelo},
-                               {'placa': placa},
-                               {'ano_de_fabricacao': ano_de_fabricacao}
-                               )
-            except IntegrityError as e:
-                return jsonify({'error': str(e)})
+            return jsonify({"error": 'Placa já cadastrada'})
+
+        novo_veiculo = Veiculos(cliente_associados=cliente_associados, marca=marca, modelo=modelo, placa=placa, ano_de_fabricacao=ano_de_fabricacao)
+        novo_veiculo.set_senha_hash(senha)
+        novo_veiculo.save(db_session)
+
+        veiculo_id = novo_veiculo.id
+        return jsonify({"msg": f"Veiculo cadastrado com sucesso. ID: {veiculo_id}"}), 201
+    except SQLAlchemyError as e:
+        return jsonify({"error": f'Erro ao registrar veiculo: {str(e)}'}), 500
+    # Fecha a sessao e abre outra, por segurança
+    finally:
+        db_session.close()
+
+
 
 @app.route('/registrar_servico', methods=['POST'])
 def registrar_servicos():
@@ -126,15 +135,13 @@ def registrar_servicos():
                                         valor_estimado=valor_estimado)
             serivco.save(banco_session)
             return jsonify({'veiculo': serivco.veiculo_associados},
-                           {'data de abertura':serivco.data_de_abertura},
-                           {'descricao do servico':serivco.descricao_do_servicos},
+                           {'data de abertura': serivco.data_de_abertura},
+                           {'descricao do servico': serivco.descricao_do_servicos},
                            {'status': serivco.status},
                            {'valor estimado': serivco.valor_estimado}
                            )
         except IntegrityError as e:
             return jsonify({'error': str(e)})
-
-
 
 
 @app.route('/consulta_veiculo_por_cliente/<id_cliente>')
@@ -156,6 +163,7 @@ def consulta_veiculo_cliente(id_cliente):
             return jsonify({'nao a veiculos no nome desse cliente'})
     except IntegrityError as e:
         return jsonify({'error': str(e)})
+
 
 @app.route('/consulta_servicos_por_cliente/<status>')
 def consulta_servicos_por_cliente(status):
