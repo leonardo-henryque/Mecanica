@@ -20,20 +20,20 @@ def cadastrar_nv():
         endereco = request.form.get('endereco')
         email = request.form.get('email')
 
-        cpf_cadastrado = select(Clientes)
-        cpf_cadastrado = banco_session.execute(cpf_cadastrado.filter_by(CPF=cpf)).first()
-        if cpf_cadastrado:
-            return jsonify({"error": 'CPF ja cadastrado'})
+        # cpf_cadastrado = select(Clientes)
+        # cpf_cadastrado = banco_session.execute(cpf_cadastrado.filter_by(CPF=cpf)).first()
+        # if cpf_cadastrado:
+        #     return jsonify({"error": 'CPF ja cadastrado'})
 
-        email_cadastrado = select(Clientes)
-        email_cadastrado = banco_session.execute(email_cadastrado.filter_by(email=email)).first()
-        if email_cadastrado:
-            return jsonify({"error": 'email ja cadastrado'})
-
-        endereco_cadastrado = select(Clientes)
-        endereco_cadastrado = banco_session.execute(endereco_cadastrado.filter_by(endereco=endereco)).first()
-        if endereco_cadastrado:
-            return jsonify({"error": 'endereco ja cadastrado'})
+        # email_cadastrado = select(Clientes)
+        # email_cadastrado = banco_session.execute(email_cadastrado.filter_by(email=email)).first()
+        # if email_cadastrado:
+        #     return jsonify({"error": 'email ja cadastrado'})
+        #
+        # endereco_cadastrado = select(Clientes)
+        # endereco_cadastrado = banco_session.execute(endereco_cadastrado.filter_by(endereco=endereco)).first()
+        # if endereco_cadastrado:
+        #     return jsonify({"error": 'endereco ja cadastrado'})
         if not nome:
             return jsonify({"error": 'campo nome vazio'}), 400
         if not cpf:
@@ -45,16 +45,18 @@ def cadastrar_nv():
         else:
             try:
                 usuario_salvo = Clientes(nome=nome,
-                                            CPF=cpf,
-                                            telefone=telefone,
+                                            CPF=int(cpf),
+                                            telefone=int(telefone),
                                             endereco=endereco,
-                                            email=email)
+                                            email=email,
+                                         )
                 usuario_salvo.save(banco_session)
                 return jsonify({
                     'nome': usuario_salvo.nome,
                     'cpf': usuario_salvo.CPF,
                     'tefone': usuario_salvo.telefone,
-                    'endereco': usuario_salvo.endereco})
+                    'endereco': usuario_salvo.endereco,
+                    'email': usuario_salvo.email})
             except IntegrityError as e:
                 return jsonify({'error': str(e)})
 
